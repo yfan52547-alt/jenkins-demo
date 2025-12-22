@@ -4,15 +4,23 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                echo 'Pulling code from GitHub'
-                sh 'ls -la'
+                echo 'Checkout code'
+                checkout scm
             }
         }
 
-        stage('Hello') {
+        stage('Build Docker Image') {
             steps {
-                echo 'Hello Jenkins CI!'
-                sh 'echo "Build success at $(date)"'
+                sh 'docker build -t jenkins-demo:latest .'
+            }
+        }
+
+        stage('Run Container') {
+            steps {
+                sh '''
+                docker rm -f jenkins-demo || true
+                docker run -d -p 8080:80 --name jenkins-demo jenkins-demo:latest
+                '''
             }
         }
     }
