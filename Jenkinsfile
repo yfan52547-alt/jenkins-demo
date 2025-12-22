@@ -22,7 +22,6 @@ pipeline {
                     -p 8081:80 \
                     jenkins-demo:latest
                 '''
-                  }
             }
         }
     }
