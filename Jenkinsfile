@@ -14,13 +14,15 @@ pipeline {
                 sh 'docker build -t jenkins-demo:latest .'
             }
         }
-
         stage('Run Container') {
-            steps {
+              steps {
                 sh '''
-                docker rm -f jenkins-demo || true
-                docker run -d -p 8080:80 --name jenkins-demo jenkins-demo:latest
+                  docker rm -f jenkins-demo || true
+                  docker run -d --name jenkins-demo \
+                    -p 8081:80 \
+                    jenkins-demo:latest
                 '''
+                  }
             }
         }
     }
