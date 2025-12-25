@@ -2,7 +2,7 @@ pipeline {
   agent any
 
   environment {
-    REGISTRY   = "registry.cn-hangzhou.aliyuncs.com"
+    REGISTRY   = "crpi-qvxmqo14dnp2pn9g.cn-hangzhou.personal.cr.aliyuncs.com"  // 修改这里
     NAMESPACE  = "ray-dev"
     IMAGE_NAME = "gallery-app"
   }
