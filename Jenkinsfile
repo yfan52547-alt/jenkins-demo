@@ -13,6 +13,32 @@ pipeline {
         checkout scm
       }
     }
+    /* ========= 新增：SonarQube 代码分析 ========= */
+    stage('SonarQube Analysis') {
+      steps {
+        withSonarQubeEnv('sonarqube') {
+          sh '''
+            docker run --rm \
+              -v "$PWD:/usr/src" \
+              sonarsource/sonar-scanner-cli \
+              -Dsonar.projectKey=gallery-app \
+              -Dsonar.projectName=gallery-app \
+              -Dsonar.sources=. \
+              -Dsonar.host.url=$SONAR_HOST_URL \
+              -Dsonar.login=$SONAR_AUTH_TOKEN
+          '''
+        }
+      }
+    }
+
+    /* ========= 新增：质量门禁 ========= */
+    stage('Quality Gate') {
+      steps {
+        timeout(time: 10, unit: 'MINUTES') {
+          waitForQualityGate abortPipeline: true
+        }
+      }
+    }
 
     stage('Build Image') {
       steps {
