@@ -4,22 +4,17 @@ pipeline {
 
   environment {
     REGISTRY = "crpi-qvxmqo14dnp2pn9g.cn-hangzhou.personal.cr.aliyuncs.com"
+    REPO = "gallery-app"
 
-    // commit-* 推到这里（按你实际改）
-    COMMIT_NAMESPACE = "gallery-app"
-    COMMIT_REPO      = "gallery-app"
-
-    // release(v*) 推到这里（按你实际改）
-    RELEASE_NAMESPACE = "ray-dev"
-    RELEASE_REPO      = "ray-dev"
-
-    // 1=禁止覆盖已有版本（强烈建议开启）
+    // 禁止覆盖已有版本（强烈建议开启）
     FORBID_OVERWRITE = "1"
   }
 
   stages {
     stage('Checkout') {
-      steps { checkout scm }
+      steps { 
+        checkout scm
+      }
     }
 
     stage('Build Image (commit-*)') {
@@ -28,7 +23,7 @@ pipeline {
           def sha = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
           env.SHA = sha
           env.COMMIT_TAG = "commit-${sha}"
-          env.COMMIT_IMAGE = "${REGISTRY}/${COMMIT_NAMESPACE}/${COMMIT_REPO}:${env.COMMIT_TAG}"
+          env.COMMIT_IMAGE = "${REGISTRY}/${REPO}:${env.COMMIT_TAG}"
         }
         sh """
           set -e
@@ -40,7 +35,7 @@ pipeline {
     stage('Push commit-* to ACR') {
       steps {
         withCredentials([usernamePassword(
-          credentialsId: 'acr-login',  // 修改为已有的凭据ID
+          credentialsId: 'acr-login', // 使用正确的凭据ID
           usernameVariable: 'ACR_USER',
           passwordVariable: 'ACR_PASS'
         )]) {
@@ -55,7 +50,7 @@ pipeline {
       }
     }
 
-    stage('Manual Approval (SemVer)') {
+    stage('Manual Approval (Version Input for TEST/RELEASE)') {
       steps {
         script {
           def v = input(
@@ -64,29 +59,26 @@ pipeline {
             parameters: [
               string(
                 name: 'VERSION',
-                defaultValue: 'v1.0.0-rc.1',
+                defaultValue: 'v1.0.0',
                 description: 'Format: vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-rc.N (e.g. v1.2.3, v1.2.3-rc.1)'
               )
             ]
           ).trim()
 
-          // 基础防呆：不允许空值/空格
+          // 校验版本格式
           if (!v || v.contains(' ')) {
             error "Invalid VERSION: empty or contains spaces. Got: '${v}'"
           }
 
-          // 企业常用 SemVer + rc（严格一点）
-          // 允许：
-          //  - v1.2.3
-          //  - v1.2.3-rc.1
-          //  - v0.1.0-rc.12
-          def semverRcPattern = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-rc\.(0|[1-9]\d*))?$/
-          if (!(v ==~ semverRcPattern)) {
+          // 使用正则校验 SemVer 格式
+          def semverPattern = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-rc\.(0|[1-9]\d*))?$/
+          if (!(v ==~ semverPattern)) {
             error "Invalid VERSION '${v}'. Must match: vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-rc.N. Example: v1.2.3-rc.1"
           }
 
+          // 设置环境变量
           env.VERSION = v
-          env.RELEASE_IMAGE = "${REGISTRY}/${RELEASE_NAMESPACE}/${RELEASE_REPO}:${v}"
+          env.RELEASE_IMAGE = "${REGISTRY}/${REPO}:${v}"
 
           echo "Will promote: ${COMMIT_IMAGE} -> ${RELEASE_IMAGE}"
         }
@@ -96,7 +88,7 @@ pipeline {
     stage('Promote: retag & push release tag') {
       steps {
         withCredentials([usernamePassword(
-          credentialsId: 'acr-login',  // 使用正确的凭据ID
+          credentialsId: 'acr-login', // 使用正确的凭据ID
           usernameVariable: 'ACR_USER',
           passwordVariable: 'ACR_PASS'
         )]) {
@@ -104,7 +96,7 @@ pipeline {
             set -e
             echo "\$ACR_PASS" | docker login ${REGISTRY} -u "\$ACR_USER" --password-stdin
 
-            # 禁止覆盖（企业强烈建议：制品不可变）
+            // 防止覆盖已有版本
             if [ "${FORBID_OVERWRITE}" = "1" ]; then
               if docker manifest inspect "${RELEASE_IMAGE}" >/dev/null 2>&1; then
                 echo "ERROR: ${RELEASE_IMAGE} already exists. Refusing to overwrite."
@@ -112,13 +104,18 @@ pipeline {
               fi
             fi
 
-            # promote（不重建）：pull -> tag -> push
+            // 推送测试版本
             docker pull "${COMMIT_IMAGE}" || true
             docker tag  "${COMMIT_IMAGE}" "${RELEASE_IMAGE}"
             docker push "${RELEASE_IMAGE}"
           """
         }
       }
+    }
+  }
+  post {
+    always {
+      echo "Pipeline finished."
     }
   }
 }
