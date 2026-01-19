@@ -40,10 +40,12 @@ pipeline {
     stage('Push commit-* to ACR') {
       steps {
         withCredentials([usernamePassword(
-          credentialsId: 'acr-push',
+          credentialsId: 'acr-login',  // 修改为已有的凭据ID
           usernameVariable: 'ACR_USER',
           passwordVariable: 'ACR_PASS'
         )]) {
+          echo "ACR User: ${env.ACR_USER}"  // 用于调试
+          echo "ACR Password: ${env.ACR_PASS}"  // 用于调试
           sh """
             set -e
             echo "\$ACR_PASS" | docker login ${REGISTRY} -u "\$ACR_USER" --password-stdin
@@ -94,7 +96,7 @@ pipeline {
     stage('Promote: retag & push release tag') {
       steps {
         withCredentials([usernamePassword(
-          credentialsId: 'acr-push',
+          credentialsId: 'acr-login',  // 使用正确的凭据ID
           usernameVariable: 'ACR_USER',
           passwordVariable: 'ACR_PASS'
         )]) {
