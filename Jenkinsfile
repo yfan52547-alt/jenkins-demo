@@ -3,7 +3,7 @@ pipeline {
 
   environment {
     // ✅ 改成你的 ACR 信息（只写域名，不要带 /namespace/repo）
-    REGISTRY   = "crpi-xxxxxxxxxxxxxxxx.cn-hangzhou.personal.cr.aliyuncs.com"
+    REGISTRY   = "crpi-qvxmqo14dnp2pn9g.cn-hangzhou.personal.cr.aliyuncs.com"
     NAMESPACE  = "ray-dev"
     IMAGE_NAME = "gallery-app"
   }
