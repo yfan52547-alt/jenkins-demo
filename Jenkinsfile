@@ -2,7 +2,6 @@ pipeline {
   agent any
 
   environment {
-    // ✅ 改成你的 ACR 信息（只写域名，不要带 /namespace/repo）
     REGISTRY   = "crpi-qvxmqo14dnp2pn9g.cn-hangzhou.personal.cr.aliyuncs.com"
     NAMESPACE  = "ray-dev"
     IMAGE_NAME = "gallery-app"
@@ -18,23 +17,23 @@ pipeline {
       }
     }
 
-    // ✅ 从 Git 仓库读取 VERSION，并强制校验格式（每次必填）
-    stage('Read & Validate Version') {
+    stage('Manual Input Version') {
       steps {
         script {
-          if (!fileExists('VERSION')) {
-            error("❌ 缺少 VERSION 文件：请在仓库根目录创建 VERSION，内容如 V.1.1 或 V.1.1.1")
-          }
+          def v = input(
+            message: '请输入发布版本（格式：V.X.X 或 V.X.X.X）',
+            ok: '确认发布',
+            parameters: [
+              string(name: 'RELEASE_VERSION', defaultValue: 'V.1.1', description: '例如：V.1.1 或 V.1.1.1（X为数字，可为 9 或 99）')
+            ]
+          ).trim()
 
-          def v = readFile('VERSION').trim()
-
-          // 支持：V.1.1 或 V.1.1.1（每段 1-2 位数字：9 或 99 都可以）
           if (!(v ==~ /^V\.\d{1,2}\.\d{1,2}(\.\d{1,2})?$/)) {
-            error("❌ VERSION 格式不合法：${v}。应为 V.X.X 或 V.X.X.X（X为数字，可为 9 或 99）")
+            error("版本格式不合法：${v}。应为 V.X.X 或 V.X.X.X（X为数字，可为 9 或 99）")
           }
 
           env.RELEASE_VERSION = v
-          echo "✅ Release Version (from VERSION): ${env.RELEASE_VERSION}"
+          echo "✅ Manual Release Version: ${env.RELEASE_VERSION}"
         }
       }
     }
@@ -57,10 +56,7 @@ pipeline {
             echo "IMAGE_VER => ${IMAGE_VER}"
             docker version
 
-            # 构建：先用 commit-SHA 标签（唯一可追溯）
             docker build -t ${IMAGE_SHA} .
-
-            # 再打一个“手动版本号”标签（便于发布/沟通）
             docker tag ${IMAGE_SHA} ${IMAGE_VER}
           '''
         }
