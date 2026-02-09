@@ -1,14 +1,22 @@
 pipeline {
   agent any
 
+  parameters {
+    booleanParam(
+      name: 'DO_RELEASE',
+      defaultValue: false,
+      description: '是否发布到测试仓库（勾选后会弹窗输入 V.x.x 或 V.x.x.x）'
+    )
+  }
+
   environment {
     REGISTRY = "crpi-qvxmqo14dnp2pn9g.cn-hangzhou.personal.cr.aliyuncs.com"
 
-    // ✅ 研发仓库（commit-SHA）——截图第2行：命名空间 gallery-app，仓库 gallery-app
+    // ✅ 研发仓库（commit-SHA）
     DEV_NAMESPACE  = "gallery-app"
     DEV_REPO       = "gallery-app"
 
-    // ✅ 测试仓库（release版本）——截图第1行：命名空间 ray-dev，仓库 gallery-app
+    // ✅ 测试仓库（release版本）
     TEST_NAMESPACE = "ray-dev"
     TEST_REPO      = "gallery-app"
   }
@@ -26,7 +34,6 @@ pipeline {
         script {
           def sha = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
           env.SNAPSHOT_TAG = "commit-${sha}"
-
           env.DEV_IMAGE = "${REGISTRY}/${DEV_NAMESPACE}/${DEV_REPO}:${env.SNAPSHOT_TAG}"
 
           sh """
@@ -51,8 +58,11 @@ pipeline {
       }
     }
 
-    // ✅ 发布阶段：弹窗输入 V.x.x 或 V.x.x.x，然后推到测试仓库
+    // ✅ 只有 DO_RELEASE=true 才会执行；否则直接跳过，不会卡住占资源
     stage('Release to TEST (Manual Version)') {
+      when {
+        expression { return params.DO_RELEASE }
+      }
       steps {
         script {
           def v = input(
@@ -104,7 +114,11 @@ pipeline {
     success {
       echo "✅ SUCCESS"
       echo "Snapshot (DEV): ${env.DEV_IMAGE}"
-      echo "Release  (TEST): ${env.TEST_IMAGE}"
+      if (params.DO_RELEASE) {
+        echo "Release  (TEST): ${env.TEST_IMAGE}"
+      } else {
+        echo "Release  (TEST): skipped (DO_RELEASE=false)"
+      }
     }
   }
 }
